@@ -1,0 +1,112 @@
+# ファイルフォーマットのバージョン
+version: "3"
+
+# 使用するサービスの定義
+services:
+    # PHPの設定
+    php:
+        # コンテナの作成方法ファイルを指定
+        build: 
+            dockerfile: docker/php.dockerfile
+            context: .
+        # コンテナの名前を設定
+        container_name: php
+        # コンテナが使用するネットワークを設定
+        networks:
+            - backend
+        # 環境変数を設定　.envの値を使っている
+        environment:
+            - DB_NAME=${DB_NAME}
+            - DB_USER=${DB_USER}
+            - DB_PW=${DB_PW}
+            - DB_HOST=db
+        # データの永続保存設定
+        volumes:
+            # ホストマシーンのpath:コンテナのpath
+            # irohaコンテンツを/var/www/htmlにバインド
+            - ./iroha:/var/www/html/
+    
+    # Apacheの設定
+    apache:
+        # コンテナの作成方法ファイルを指定
+        build: 
+            dockerfile: docker/apache.dockerfile
+            context: .
+        # コンテナの名前を設定
+        container_name: apache
+        # コンテナの依存設定　指定したコンテナの作成後にこのコンテナを作成
+        depends_on:
+            - php
+            - db
+        # コンテナが使用するネットワークを設定
+        networks:
+            - frontend
+            - backend
+        # コンテナが使用するポートの設定 
+        ports:
+            # ホストマシーンポート:コンテナポート
+            - "80:80"
+        # データの永続保存設定
+        volumes:
+            # ホストマシーンのpath:コンテナのpath
+            # irohaコンテンツを/var/www/htmlにバインド
+            - ./iroha:/var/www/html/
+    
+    # DBの設定
+    db:
+        # コンテナの作成方法ファイルを指定
+        build: 
+            context: .
+            dockerfile: docker/mysql.dockerfile
+        restart: always
+        # コンテナの名前を設定
+        container_name: db
+        # コンテナが使用するポートの設定 
+        ports: 
+            - "3306"
+        # 環境変数を設定　.envの値を使っている
+        environment:
+            - MYSQL_DATABASE=${DB_NAME}
+            - MYSQL_USER=${DB_USER}
+            - MYSQL_PASSWORD=${DB_PW}
+            - MYSQL_ROOT_PASSWORD=${DB_ROOT_PW}
+            - TZ=${DB_ROOT_PW}
+         # データの永続保存設定
+        volumes:
+            # ホストマシーンのpath:コンテナのpath
+            # dataコンテンツを/var/lib/mysqlにバインド
+            - ./data:/var/lib/mysql
+        # コンテナが使用するネットワークを設定
+        networks: 
+            - backend
+
+    # phpMyadminの設定
+    phpmyadmin:
+        # コンテナ作成に使用するイメージの設定
+        image: phpmyadmin/phpmyadmin
+        # コンテナの名前を設定
+        container_name: phpmyadmin
+        # コンテナが使用するポートの設定 
+        ports: 
+            # ホストマシーンポート:コンテナポート
+            - "8081:80"
+        # コンテナが使用するネットワークを設定
+        networks: 
+            - backend
+        # 環境変数を設定
+        environment:
+            - PMA_ARBITRARY=1
+        # コンテナの依存設定　指定したコンテナの作成後にこのコンテナを作成
+        depends_on:
+            - db
+
+# 使用するネットワークの定義
+networks: 
+    #ネットワーク名
+    backend:
+        # ネットワークドライバをbridgeに設定
+        driver: bridge
+    #ネットワーク名
+    frontend:
+        # ネットワークドライバをbridgeに設定
+        driver: bridge
